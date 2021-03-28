@@ -169,7 +169,12 @@ impl Client {
             Err(_e) => bail!("Invalid URI"),
         };
         if self.filter.excluded(&request) {
-            return Ok(Response::new(request.uri, Status::Excluded, request.source));
+            return Ok(Response::new(
+                request.uri,
+                Status::Excluded,
+                request.source,
+                request.recursion_level,
+            ));
         }
         let status = match request.uri {
             Uri::Website(ref url) => self.check_website(&url).await,
@@ -181,7 +186,12 @@ impl Client {
                 }
             }
         };
-        Ok(Response::new(request.uri, status, request.source))
+        Ok(Response::new(
+            request.uri,
+            status,
+            request.source,
+            request.recursion_level,
+        ))
     }
 
     pub async fn check_website(&self, url: &Url) -> Status {
@@ -265,7 +275,7 @@ impl Client {
     }
 }
 
-/// A convenience function to check a single URI
+/// A convenience function to check a single URI.
 /// This is the most simple link check and avoids having to create a client manually.
 /// For more complex scenarios, look into using the `ClientBuilder` instead.
 pub async fn check<T: TryInto<Request>>(request: T) -> Result<Response> {

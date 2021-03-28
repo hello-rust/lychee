@@ -3,15 +3,22 @@ use anyhow::anyhow;
 use serde::{Serialize, Serializer};
 use std::{collections::HashSet, convert::TryFrom, fmt::Display};
 
+pub type Cache = HashSet<String>;
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Request {
     pub uri: Uri,
     pub source: Input,
+    pub recursion_level: usize,
 }
 
 impl Request {
-    pub fn new(uri: Uri, source: Input) -> Self {
-        Request { uri, source }
+    pub fn new(uri: Uri, source: Input, recursion_level: usize) -> Self {
+        Request {
+            uri,
+            source,
+            recursion_level,
+        }
     }
 }
 
@@ -26,7 +33,7 @@ impl TryFrom<String> for Request {
 
     fn try_from(s: String) -> Result<Self, Self::Error> {
         let uri = Uri::try_from(s.as_str())?;
-        Ok(Request::new(uri, Input::String(s)))
+        Ok(Request::new(uri, Input::String(s), 0))
     }
 }
 
@@ -35,7 +42,7 @@ impl TryFrom<&str> for Request {
 
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         let uri = Uri::try_from(s)?;
-        Ok(Request::new(uri, Input::String(s.to_owned())))
+        Ok(Request::new(uri, Input::String(s.to_owned()), 0))
     }
 }
 
@@ -56,21 +63,24 @@ impl TryFrom<String> for RequestMethod {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Serialize, Clone)]
 pub struct Response {
     #[serde(flatten)]
     pub uri: Uri,
     pub status: Status,
     #[serde(skip)]
     pub source: Input,
+    #[serde(skip)]
+    pub recursion_level: usize,
 }
 
 impl Response {
-    pub fn new(uri: Uri, status: Status, source: Input) -> Self {
+    pub fn new(uri: Uri, status: Status, source: Input, recursion_level: usize) -> Self {
         Response {
             uri,
             status,
             source,
+            recursion_level,
         }
     }
 }
@@ -96,7 +106,7 @@ impl Display for Response {
 }
 
 /// Response status of the request
-#[derive(Debug, Hash, PartialEq, Eq)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub enum Status {
     /// Request was successful
     Ok(http::StatusCode),

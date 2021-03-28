@@ -8,7 +8,7 @@ use stats::color_response;
 use std::{collections::HashSet, time::Duration};
 use std::{fs, str::FromStr};
 use structopt::StructOpt;
-use tokio::sync::mpsc;
+use tokio::sync::mpsc::{self, Sender};
 
 mod options;
 mod stats;
@@ -16,7 +16,10 @@ mod stats;
 use crate::options::{Config, LycheeOptions};
 use crate::stats::ResponseStats;
 
-use lychee::collector::{self, Input};
+use lychee::{
+    collector::{self, Input},
+    Cache, Request,
+};
 use lychee::{ClientBuilder, ClientPool, Response};
 
 /// A C-like enum that can be cast to `i32` and used as process exit code.
@@ -86,6 +89,20 @@ fn fmt(stats: &ResponseStats, format: &Format) -> Result<String> {
     })
 }
 
+// Get the set of input domains
+// This is needed for supporting recursion
+fn input_domains(inputs: Vec<Input>) -> HashSet<String> {
+    let mut domains = HashSet::new();
+    for input in inputs {
+        if let Input::RemoteUrl(url) = input {
+            if let Some(domain) = url.domain() {
+                domains.insert(domain.to_string());
+            }
+        }
+    }
+    domains
+}
+
 async fn run(cfg: &Config, inputs: Vec<Input>) -> Result<i32> {
     let mut headers = parse_headers(&cfg.headers)?;
     if let Some(auth) = &cfg.basic_auth {
@@ -118,6 +135,9 @@ async fn run(cfg: &Config, inputs: Vec<Input>) -> Result<i32> {
         .accepted(accepted)
         .build()?;
 
+    // Create link cache to keep track of seen links
+    let mut cache = Cache::new();
+
     let links = collector::collect_links(
         &inputs,
         cfg.base_url.clone(),
@@ -125,14 +145,16 @@ async fn run(cfg: &Config, inputs: Vec<Input>) -> Result<i32> {
         max_concurrency,
     )
     .await?;
+    let mut total_requests = links.len();
 
     let pb = match cfg.no_progress {
         true => None,
         false => {
             let bar = ProgressBar::new(links.len() as u64)
                 .with_style(ProgressStyle::default_bar().template(
-                "{spinner:.red.bright} {pos}/{len:.dim} [{elapsed_precise}] {bar:25} {wide_msg}",
-            ));
+                "{spinner:.red.bright} {pos}/{len:.dim} [{elapsed_precise}] {bar:25.magenta.bright/white} {wide_msg}",
+            )
+            .progress_chars("██"));
             bar.enable_steady_tick(100);
             Some(bar)
         }
@@ -144,12 +166,13 @@ async fn run(cfg: &Config, inputs: Vec<Input>) -> Result<i32> {
     let mut stats = ResponseStats::new();
 
     let bar = pb.clone();
+    let sr = send_req.clone();
     tokio::spawn(async move {
         for link in links {
             if let Some(pb) = &bar {
                 pb.set_message(&link.to_string());
             };
-            send_req.send(link).await.unwrap();
+            sr.send(link).await.unwrap();
         }
     });
 
@@ -160,9 +183,33 @@ async fn run(cfg: &Config, inputs: Vec<Input>) -> Result<i32> {
         clients.listen().await;
     });
 
-    while let Some(response) = recv_resp.recv().await {
+    let input_domains: HashSet<String> = input_domains(inputs);
+
+    // We keep track of the total number of requests
+    // and exit the loop once we reach it.
+    // Otherwise the sender would never be dropped and
+    // we'd be stuck indefinitely.
+    let mut curr = 0;
+
+    while curr < total_requests {
+        curr += 1;
+        let response = recv_resp.recv().await.context("Receive channel closed")?;
+
         show_progress(&pb, &response, cfg.verbose);
-        stats.add(response);
+        stats.add(response.clone());
+
+        if cfg.recursive {
+            let count = recurse(
+                response,
+                &mut cache,
+                &input_domains,
+                &cfg,
+                &pb,
+                send_req.clone(),
+            )
+            .await?;
+            total_requests += count;
+        }
     }
 
     // Note that print statements may interfere with the progress bar, so this
@@ -187,6 +234,68 @@ async fn run(cfg: &Config, inputs: Vec<Input>) -> Result<i32> {
         true => Ok(ExitCode::Success as i32),
         false => Ok(ExitCode::LinkCheckFailure as i32),
     }
+}
+
+async fn recurse(
+    response: Response,
+    cache: &mut Cache,
+    input_domains: &HashSet<String>,
+    cfg: &Config,
+    pb: &Option<ProgressBar>,
+    send_req: Sender<Request>,
+) -> Result<usize> {
+    let recursion_level = response.recursion_level + 1;
+
+    if let Some(depth) = cfg.depth {
+        if recursion_level > depth {
+            // Maximum recursion depth reached; stop link checking.
+            return Ok(0);
+        }
+    }
+
+    if !response.status.is_success() {
+        return Ok(0);
+    }
+    if cache.contains(response.uri.as_str()) {
+        return Ok(0);
+    }
+    cache.insert(response.uri.to_string());
+
+    if let lychee::Uri::Website(url) = response.uri {
+        let input = collector::Input::RemoteUrl(url.clone());
+
+        // Check domain against known domains
+        // If no domain is given, it might be a local link (e.g. 127.0.0.1),
+        // which we accept
+        if let Some(domain) = url.domain() {
+            if !input_domains.contains(domain) {
+                return Ok(0);
+            }
+        }
+
+        let links = collector::collect_links(
+            &[input],
+            cfg.base_url.clone(),
+            cfg.skip_missing,
+            cfg.max_concurrency,
+        )
+        .await?;
+        let count = links.len();
+
+        let bar = pb.clone();
+        tokio::spawn(async move {
+            for mut link in links {
+                link.recursion_level = recursion_level;
+                if let Some(pb) = &bar {
+                    pb.inc_length(1);
+                    pb.set_message(&link.to_string());
+                };
+                send_req.send(link).await.unwrap();
+            }
+        });
+        return Ok(count);
+    };
+    Ok(0)
 }
 
 fn read_header(input: &str) -> Result<(String, String)> {

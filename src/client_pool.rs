@@ -21,11 +21,11 @@ impl ClientPool {
     }
 
     pub async fn listen(&mut self) {
-        while let Some(req) = self.rx.recv().await {
+        while let Some(uri) = self.rx.recv().await {
             let client = self.pool.get().await;
             let tx = self.tx.clone();
             tokio::spawn(async move {
-                let resp = client.check(req).await.expect("Invalid URI");
+                let resp = client.check(uri).await.expect("Invalid URI");
                 tx.send(resp)
                     .await
                     .expect("Cannot send response to channel");

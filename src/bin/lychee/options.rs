@@ -245,6 +245,15 @@ pub struct Config {
     #[structopt(short, long, default_value = "string")]
     #[serde(default)]
     pub format: Format,
+
+    /// Enable recursion (make sub-requests for detected links)
+    #[structopt(short, long)]
+    #[serde(default)]
+    pub recursive: bool,
+
+    /// Stop link checking beyond this maximum recursion depth. (Recommended for large inputs.)
+    #[structopt(long)]
+    pub depth: Option<usize>,
 }
 
 impl Config {
@@ -299,6 +308,7 @@ impl Config {
             skip_missing: false;
             glob_ignore_case: false;
             output: None;
+            recursive: false;
         }
     }
 }

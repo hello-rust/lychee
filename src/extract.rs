@@ -157,7 +157,7 @@ pub(crate) fn extract_links(
     for link in links {
         match Uri::try_from(link.as_str()) {
             Ok(uri) => {
-                requests.insert(Request::new(uri, input_content.input.clone()));
+                requests.insert(Request::new(uri, input_content.input.clone(), 0));
             }
             Err(_) => {
                 if !Path::new(&link).exists() {
@@ -166,6 +166,7 @@ pub(crate) fn extract_links(
                             requests.insert(Request::new(
                                 Uri::Website(new_url),
                                 input_content.input.clone(),
+                                0,
                             ));
                         }
                     }
@@ -219,6 +220,26 @@ mod test {
             FileType::from(Path::new("/absolute/path/to/test.something")),
             FileType::Plaintext
         );
+    }
+
+    #[test]
+    fn test_extract_local_links() {
+        let input = "http://127.0.0.1/ and http://127.0.0.1:8888/ are local links.";
+        let links: HashSet<Uri> =
+            extract_links(&InputContent::from_string(input, FileType::Plaintext), None)
+                .into_iter()
+                .map(|r| r.uri)
+                .collect();
+        assert_eq!(
+            links,
+            [
+                website("http://127.0.0.1/"),
+                website("http://127.0.0.1:8888/")
+            ]
+            .iter()
+            .cloned()
+            .collect()
+        )
     }
 
     #[test]

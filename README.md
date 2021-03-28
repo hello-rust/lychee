@@ -19,8 +19,8 @@ use
 | -------------------- | ------- | ------------- | -------- | --------------------- | ------------ | ------------- | --------------------- | ------ |
 | Language             | Rust    | Ruby          | Go       | JS                    | TypeScript   | Python        | JS                    | PHP    |
 | Async/Parallel       | ![yes]  | ![yes]        | ![yes]   | ![yes]                | ![yes]       | ![yes]        | ![yes]                | ![yes] |
-| JSON output | ![yes] | ![no] | ![yes] | ![yes] | ![yes] | ![maybe]<sup>1</sup> | ![yes] | ![yes] |
-| Static binary        | ![yes]  | ![no]         | ![yes]   | ![no]                 | ![no]        | ️ ![no]       | ![no]                 | ![no]  |
+| JSON output          | ![yes]  | ![no]         | ![yes]   | ![yes]                | ![yes]       | ![maybe]<sup>1</sup>     | ![yes]     | ![yes] |
+| Static binary        | ![yes]  | ![no]         | ![yes]   | ![no]                 | ![no]        | ️ ![no]         | ![no]                 | ![no]  |
 | Markdown files       | ![yes]  | ![yes]        | ![no]    | ![no]                 | ![no]        | ![yes]        | ️ ![yes]              | ![no]  |
 | HTML files           | ![yes]  | ![no]         | ![no]    | ![yes]                | ![yes]       | ![no]         | ![yes]                 | ![no]  |
 | Text files           | ![yes]  | ![no]         | ![no]    | ![no]                 | ![no]        | ![no]         | ![no]                | ![no]  |
@@ -31,7 +31,7 @@ use
 | Custom user agent    | ![yes]  | ![no]         | ![no]    | ![yes]                | ![no]        | ![yes]        | ![no]                 | ![no]  |
 | Relative URLs        | ![yes]  | ![yes]        | ![no]    | ![yes]                | ![yes]       | ![yes]        | ![yes]                | ![yes] |
 | Skip relative URLs   | ![yes]  | ![no]         | ![no]    | ![maybe]              | ![no]        | ![no]         | ![no]                 | ![no]  |
-| Include patterns     | ![yes]️ | ![yes]        | ![no]    | ![yes]                | ![no]        | ![no]         | ![no]                 | ![no]  |
+| Include patterns     | ![yes]️  | ![yes]        | ![no]    | ![yes]                | ![no]        | ![no]         | ![no]                 | ![no]  |
 | Exclude patterns     | ![yes]  | ![no]         | ![yes]   | ![yes]                | ![yes]       | ![yes]        | ![yes]                | ![yes] |
 | Handle redirects     | ![yes]  | ![yes]        | ![yes]   | ![yes]                | ![yes]       | ![yes]        | ![yes]                | ![yes] |
 | Ignore insecure SSL  | ![yes]  | ![yes]        | ![yes]   | ![no]                 | ![no]        | ![yes]        | ![no]                 | ![yes] |
@@ -50,7 +50,7 @@ use
 | [Use as library]     | ![yes]  | ![yes]        | ![no]    | ![yes]                | ![yes]       | ![no]         | ![yes]                | ![no]  |
 | Quiet mode           | ![yes]  | ![no]         | ![no]    | ![no]                 | ![yes]       | ![yes]        | ![yes]                | ![yes] |
 | Config file          | ![yes]  | ![no]         | ![no]    | ![no]                 | ![yes]       | ![yes]        | ![yes]                | ![no]  |
-| Recursion | ![no]  | ![no]         | ![no]    | ![yes]                 | ![yes]        | ![yes]         | ![yes]                 | ![no]  |
+| Recursion            | ![yes]  | ![no]         | ![no]    | ![yes]                | ![yes]       | ![yes]        | ![yes]                | ![no]  |
 | Amazing lychee logo  | ![yes]  | ![no]         | ![no]    | ![no]                 | ![no]        | ![no]         | ![no]                 | ![no]  |
 
 [awesome_bot]: https://github.com/dkhamsing/awesome_bot
@@ -164,6 +164,7 @@ FLAGS:
     -i, --insecure               Proceed for server connections considered insecure (invalid TLS)
     -n, --no-progress            Do not show progress bar. This is recommended for non-interactive shells (e.g. for
                                  continuous integration)
+    -r, --recursive              Enable recursion (make sub-requests for detected links)
         --skip-missing           Skip missing input files (default is to error if they don't exist)
     -V, --version                Prints version information
     -v, --verbose                Verbose program output
@@ -173,6 +174,8 @@ OPTIONS:
     -b, --base-url <base-url>                  Base URL to check relative URLs
         --basic-auth <basic-auth>              Basic authentication support. E.g. `username:password`
     -c, --config <config-file>                 Configuration file to use [default: ./lychee.toml]
+        --depth <depth>                        Stop link checking beyond this maximum recursion depth. (Recommended for
+                                               large inputs.)
         --exclude <exclude>...                 Exclude URLs from checking (supports regex)
     -f, --format <format>                      Output file format of status report (json, string) [default: string]
         --github-token <github-token>          GitHub API token to use when checking github.com links, to avoid rate
