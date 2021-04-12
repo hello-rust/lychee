@@ -96,7 +96,7 @@ async fn run(cfg: &Config, inputs: Vec<Input>) -> Result<i32> {
     let accepted = cfg.accept.clone().and_then(|a| parse_statuscodes(&a).ok());
     let timeout = parse_timeout(cfg.timeout);
     let max_concurrency = cfg.max_concurrency;
-    let method: reqwest::Method = reqwest::Method::from_str(&cfg.method.to_uppercase())?;
+    let method: http::Method = http::Method::from_str(&cfg.method.to_uppercase())?;
     let include = RegexSet::new(&cfg.include)?;
     let exclude = RegexSet::new(&cfg.exclude)?;
 
@@ -119,21 +119,22 @@ async fn run(cfg: &Config, inputs: Vec<Input>) -> Result<i32> {
         .accepted(accepted)
         .build()?;
 
-    let links = collector::collect_links(
-        &inputs,
+    let mut links = collector::collect_links(
+        inputs,
         cfg.base_url.clone(),
         cfg.skip_missing,
-        max_concurrency,
+        cfg.max_concurrency,
     )
     .await?;
 
     let pb = match cfg.no_progress {
         true => None,
         false => {
-            let bar = ProgressBar::new(links.len() as u64)
-                .with_style(ProgressStyle::default_bar().template(
+            let bar = ProgressBar::new_spinner().with_style(ProgressStyle::default_bar().template(
                 "{spinner:.red.bright} {pos}/{len:.dim} [{elapsed_precise}] {bar:25} {wide_msg}",
             ));
+            bar.set_length(0);
+            bar.set_message("Extracting links");
             bar.enable_steady_tick(100);
             Some(bar)
         }
@@ -146,8 +147,9 @@ async fn run(cfg: &Config, inputs: Vec<Input>) -> Result<i32> {
 
     let bar = pb.clone();
     tokio::spawn(async move {
-        for link in links {
+        while let Some(link) = links.recv().await {
             if let Some(pb) = &bar {
+                pb.inc_length(1);
                 pb.set_message(&link.to_string());
             };
             send_req.send(link).await.unwrap();
@@ -220,7 +222,7 @@ fn parse_headers<T: AsRef<str>>(headers: &[T]) -> Result<HeaderMap> {
 fn parse_statuscodes<T: AsRef<str>>(accept: T) -> Result<HashSet<http::StatusCode>> {
     let mut statuscodes = HashSet::new();
     for code in accept.as_ref().split(',').into_iter() {
-        let code: reqwest::StatusCode = reqwest::StatusCode::from_bytes(code.as_bytes())?;
+        let code: http::StatusCode = http::StatusCode::from_bytes(code.as_bytes())?;
         statuscodes.insert(code);
     }
     Ok(statuscodes)
