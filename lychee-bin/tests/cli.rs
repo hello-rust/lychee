@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod cli {
     use std::{
-        fs::{self, File},
+        fs::File,
         io::Write,
         path::{Path, PathBuf},
     };
@@ -87,8 +87,9 @@ mod cli {
         }};
     }
 
-    #[test]
-    fn test_exclude_all_private() -> Result<()> {
+    #[tokio::test]
+    #[cfg_attr(not(feature = "json_output"), ignore)]
+    async fn test_exclude_all_private() -> Result<()> {
         test_json_output!(
             "TEST_ALL_PRIVATE.md",
             MockResponseStats {
@@ -101,8 +102,9 @@ mod cli {
         )
     }
 
-    #[test]
-    fn test_exclude_email() -> Result<()> {
+    #[tokio::test]
+    #[cfg_attr(not(feature = "json_output"), ignore)]
+    async fn test_exclude_email() -> Result<()> {
         test_json_output!(
             "TEST_EMAIL.md",
             MockResponseStats {
@@ -116,8 +118,9 @@ mod cli {
     }
 
     /// Test that a GitHub link can be checked without specifying the token.
-    #[test]
-    fn test_check_github_no_token() -> Result<()> {
+    #[tokio::test]
+    #[cfg_attr(not(feature = "json_output"), ignore)]
+    async fn test_check_github_no_token() -> Result<()> {
         test_json_output!(
             "TEST_GITHUB.md",
             MockResponseStats {
@@ -128,8 +131,9 @@ mod cli {
         )
     }
 
-    #[test]
-    fn test_quirks() -> Result<()> {
+    #[tokio::test]
+    #[cfg_attr(not(feature = "json_output"), ignore)]
+    async fn test_quirks() -> Result<()> {
         test_json_output!(
             "TEST_QUIRKS.txt",
             MockResponseStats {
@@ -158,13 +162,14 @@ mod cli {
         Ok(())
     }
 
-    #[test]
-    fn test_failure_github_404_no_token() {
+    #[tokio::test]
+    async fn test_failure_github_404_no_token() {
         let mut cmd = main_command();
         let test_github_404_path = fixtures_path().join("TEST_GITHUB_404.md");
 
+        #[cfg(feature = "indicatif")]
+        cmd.arg("--no-progress");
         cmd.arg(test_github_404_path)
-            .arg("--no-progress")
             .env_clear()
             .assert()
             .failure()
@@ -212,8 +217,8 @@ mod cli {
             .success();
     }
 
-    #[test]
-    fn test_missing_file_error() {
+    #[tokio::test]
+    async fn test_missing_file_error() {
         let mut cmd = main_command();
         let filename = format!("non-existing-file-{}", uuid::Uuid::new_v4().to_string());
 
@@ -227,8 +232,8 @@ mod cli {
             )));
     }
 
-    #[test]
-    fn test_missing_file_ok_if_skip_missing() {
+    #[tokio::test]
+    async fn test_missing_file_ok_if_skip_missing() {
         let mut cmd = main_command();
         let filename = format!("non-existing-file-{}", uuid::Uuid::new_v4().to_string());
 
@@ -306,8 +311,9 @@ mod cli {
     }
 
     /// Test formatted file output
-    #[test]
-    fn test_formatted_file_output() -> Result<()> {
+    #[tokio::test]
+    #[cfg_attr(not(feature = "json_output"), ignore)]
+    async fn test_formatted_file_output() -> Result<()> {
         let mut cmd = main_command();
         let test_path = fixtures_path().join("TEST.md");
         let outfile = format!("{}.json", Uuid::new_v4());
@@ -321,9 +327,9 @@ mod cli {
             .success();
 
         let expected = r#"{"total":11,"successful":11,"failures":0,"timeouts":0,"redirects":0,"excludes":0,"errors":0,"fail_map":{}}"#;
-        let output = fs::read_to_string(&outfile)?;
+        let output = std::fs::read_to_string(&outfile)?;
         assert_eq!(output.split_whitespace().collect::<String>(), expected);
-        fs::remove_file(outfile)?;
+        std::fs::remove_file(outfile)?;
         Ok(())
     }
 }
