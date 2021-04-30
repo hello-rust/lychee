@@ -259,7 +259,7 @@ impl Config {
             Err(e) => {
                 return match e.kind() {
                     ErrorKind::NotFound => Ok(None),
-                    _ => Err(Error::from(e)),
+                    _ => Err(e.into()),
                 }
             }
         };

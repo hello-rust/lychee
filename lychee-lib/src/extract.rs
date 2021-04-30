@@ -31,7 +31,6 @@ impl Default for FileType {
 impl<P: AsRef<Path>> From<P> for FileType {
     /// Detect if the given path points to a Markdown, HTML, or plaintext file.
     fn from(p: P) -> FileType {
-        let path = p.as_ref();
         // Assume HTML in case of no extension.
         // Note: this is only reasonable for URLs; not paths on disk.
         // For example, `README` without an extension is more likely to be a plaintext file.
@@ -39,7 +38,15 @@ impl<P: AsRef<Path>> From<P> for FileType {
         // Unfortunately that's not possible without refactoring, as
         // `AsRef<Path>` could be implemented for `Url` in the future, which is why
         // `From<Url> for FileType` is not allowed.
-        match path.extension().and_then(std::ffi::OsStr::to_str) {
+
+        let path = p
+            .as_ref()
+            .extension()
+            .and_then(std::ffi::OsStr::to_str)
+            .map(str::to_lowercase);
+
+        // TODO: also use or-patterns here when stable
+        match path.as_ref().map(String::as_str) {
             Some("md") | Some("markdown") => FileType::Markdown,
             Some("htm") | Some("html") | None => FileType::Html,
             Some(_) => FileType::Plaintext,
@@ -125,6 +132,8 @@ fn elem_attr_is_link(attr_name: &str, elem_name: &str) -> bool {
     // over at: https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes
     matches!(
         (attr_name, elem_name),
+        // TODO: re-enable once `or-patterns` become stable in Rust 1.53
+        // ("href" | "src" | "srcset" | "cite", _) | ("data", "object") | ("onhashchange", "body")
         ("href", _)
             | ("src", _)
             | ("srcset", _)
@@ -224,11 +233,17 @@ mod test {
     #[test]
     fn test_file_type() {
         // FIXME: Assume plaintext in case a path has no extension
+        // REVIEW: can we just fix this or is there some compatablility
+        // reason we can't ?
         // assert_eq!(FileType::from(Path::new("/")), FileType::Plaintext);
+        // assert_eq!(FileType::from("test"), FileType::Plaintext);
         assert_eq!(FileType::from("test.md"), FileType::Markdown);
+        assert_eq!(FileType::from("TEST.MD"), FileType::Markdown);
         assert_eq!(FileType::from("test.markdown"), FileType::Markdown);
         assert_eq!(FileType::from("test.html"), FileType::Html);
+        assert_eq!(FileType::from("TEST.HTM"), FileType::Html);
         assert_eq!(FileType::from("test.txt"), FileType::Plaintext);
+        assert_eq!(FileType::from("test.TXT"), FileType::Plaintext);
         assert_eq!(FileType::from("test.something"), FileType::Plaintext);
         assert_eq!(
             FileType::from("/absolute/path/to/test.something"),
