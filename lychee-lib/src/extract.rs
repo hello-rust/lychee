@@ -26,9 +26,7 @@ fn extract_links_from_markdown(input: &str) -> Vec<String> {
     let parser = Parser::new(input);
     parser
         .flat_map(|event| match event {
-            MDEvent::Start(Tag::Link(_, url, _)) | MDEvent::Start(Tag::Image(_, url, _)) => {
-                vec![url.to_string()]
-            }
+            MDEvent::Start(Tag::Link(_, url, _) | Tag::Image(_, url, _)) => vec![url.to_string()],
             MDEvent::Text(txt) => extract_links_from_plaintext(&txt.to_string()),
             MDEvent::Html(html) => extract_links_from_html(&html.to_string()),
             _ => vec![],
@@ -93,12 +91,7 @@ fn elem_attr_is_link(attr_name: &str, elem_name: &str) -> bool {
     // over at: https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes
     matches!(
         (attr_name, elem_name),
-        ("href", _)
-            | ("src", _)
-            | ("srcset", _)
-            | ("cite", _)
-            | ("data", "object")
-            | ("onhashchange", "body")
+        ("href" | "src" | "srcset" | "cite", _) | ("data", "object") | ("onhashchange", "body")
     )
 }
 
